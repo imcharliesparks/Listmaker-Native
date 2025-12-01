@@ -19,6 +19,8 @@ import BoardCard from '../../components/BoardCard';
 import FilterTabs from '../../components/FilterTabs';
 import FloatingActionButton from '../../components/FloatingActionButton';
 import EmptyState from '../../components/EmptyState';
+import Header from "@/components/Header";
+import {Pages} from "@/constants/Shared";
 
 const FILTER_TABS = [
   { id: FilterType.ALL, label: 'All Boards' },
@@ -59,31 +61,7 @@ export default function BoardsScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Pressable style={styles.menuButton}>
-            <Ionicons name="menu" size={24} color={Colors.text} />
-          </Pressable>
-          <View style={styles.logoContainer}>
-            <View style={styles.logo}>
-              <Text style={styles.logoText}>🎯</Text>
-            </View>
-            <Text style={styles.title}>Curate</Text>
-          </View>
-          <Text style={styles.subtitle}>Your Boards</Text>
-        </View>
-
-        <View style={styles.headerRight}>
-          <Pressable style={styles.iconButton}>
-            <Ionicons name="search" size={24} color={Colors.text} />
-          </Pressable>
-          <Pressable style={styles.iconButton}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>👤</Text>
-            </View>
-          </Pressable>
-        </View>
-      </View>
+      <Header currentPage={Pages.Boards} />
 
       {/* Filter Tabs */}
       <FilterTabs

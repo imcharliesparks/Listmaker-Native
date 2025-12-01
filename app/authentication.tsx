@@ -3,11 +3,14 @@ import {SafeAreaView} from "react-native-safe-area-context";
 import {Colors} from "@/constants/Colors";
 import Header from "@/components/Header";
 import {Pages} from "@/constants/Shared";
+import {AuthForm} from "@/components/AuthForm";
 
-export default () => {
+export default function AuthenticationPage(){
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
-            <Header currentPage={Pages.Authentication} />
+            <Header currentPage={Pages.Authentication}/>
+            {/* TODO: Add auth UI */}
+            <AuthForm />
         </SafeAreaView>
     )
 }

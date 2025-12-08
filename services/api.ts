@@ -1,6 +1,7 @@
 import axios from 'axios';
-import { API_BASE_URL, TEST_USER_ID } from '../constants/Config';
+import { API_BASE_URL } from '../constants/Config';
 import { Board, Item, CreateBoardRequest, AddItemRequest } from './types';
+import { auth } from '@/config/firebase';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -9,13 +10,46 @@ const api = axios.create({
   },
 });
 
-// For MVP without auth, we'll skip the Authorization header
-// When you add auth, uncomment and modify:
-// api.interceptors.request.use((config) => {
-//   const token = await getFirebaseToken(); // Get from Firebase
-//   config.headers.Authorization = `Bearer ${token}`;
-//   return config;
-// });
+// Add Firebase token to all requests
+api.interceptors.request.use(async (config) => {
+  const user = auth.currentUser;
+  if (user) {
+    try {
+      const token = await user.getIdToken();
+      config.headers.Authorization = `Bearer ${token}`;
+    } catch (error) {
+      console.error('Error getting Firebase token:', error);
+    }
+  }
+  return config;
+});
+
+// Handle auth errors (401) by potentially refreshing token
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+
+    // If we get a 401 and haven't retried yet, try refreshing the token
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      const user = auth.currentUser;
+      if (user) {
+        try {
+          // Force refresh the token
+          const token = await user.getIdToken(true);
+          originalRequest.headers.Authorization = `Bearer ${token}`;
+          return api(originalRequest);
+        } catch (refreshError) {
+          console.error('Error refreshing token:', refreshError);
+        }
+      }
+    }
+
+    return Promise.reject(error);
+  }
+);
 
 export const boardsApi = {
   // Get all boards for user

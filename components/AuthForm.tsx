@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/Colors';
+import { useAuth } from '@/context/AuthContext';
 
 // Required for OAuth to work properly
 WebBrowser.maybeCompleteAuthSession();
@@ -24,6 +25,7 @@ export const AuthForm = () => {
   const { signUp, setActive: setActiveSignUp, isLoaded: signUpLoaded } = useSignUp();
   const { startOAuthFlow: startGoogleOAuth } = useOAuth({ strategy: 'oauth_google' });
   const { startOAuthFlow: startAppleOAuth } = useOAuth({ strategy: 'oauth_apple' });
+  const { refreshProfile } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -70,6 +72,7 @@ export const AuthForm = () => {
 
       // Set the session active
       await setActiveSignUp({ session: result.createdSessionId });
+      await refreshProfile({ force: true });
       router.replace('/');
     } catch (error: any) {
       let message = 'An error occurred during sign up';
@@ -109,6 +112,7 @@ export const AuthForm = () => {
 
       // Set the session active
       await setActiveSignIn({ session: result.createdSessionId });
+      await refreshProfile({ force: true });
       router.replace('/');
     } catch (error: any) {
       let message = 'An error occurred during sign in';
@@ -137,6 +141,7 @@ export const AuthForm = () => {
 
       if (createdSessionId) {
         await setActive!({ session: createdSessionId });
+        await refreshProfile({ force: true });
         router.replace('/');
       }
     } catch (error: any) {
@@ -151,6 +156,7 @@ export const AuthForm = () => {
 
       if (createdSessionId) {
         await setActive!({ session: createdSessionId });
+        await refreshProfile({ force: true });
         router.replace('/');
       }
     } catch (error: any) {

@@ -35,6 +35,21 @@ export interface AddItemRequest {
   url: string;
 }
 
+export interface BackendUser {
+  id: string;
+  email: string;
+  display_name?: string | null;
+  photo_url?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ApiErrorPayload {
+  error?: string;
+  message?: string;
+  details?: unknown;
+}
+
 export enum FilterType {
   ALL = 'all',
   RECENT = 'recent',

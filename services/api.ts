@@ -1,48 +1,58 @@
-import axios from 'axios';
+import axios, { AxiosError, AxiosRequestConfig, AxiosRequestHeaders } from 'axios';
 import { API_BASE_URL } from '@/constants/Config';
-import { Board, Item, CreateBoardRequest, AddItemRequest } from './types';
+import {
+  ApiErrorPayload,
+  BackendUser,
+  Board,
+  CreateBoardRequest,
+  Item,
+  AddItemRequest,
+} from './types';
 import { getToken } from './tokenProvider';
+
+interface RetryableRequestConfig extends AxiosRequestConfig {
+  _retry?: boolean;
+}
 
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 10000,
 });
 
-// Add Clerk token to all requests
 api.interceptors.request.use(
   async (config) => {
     try {
       const token = await getToken();
       if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+        const headers: AxiosRequestHeaders = (config.headers || {}) as AxiosRequestHeaders;
+        headers.Authorization = `Bearer ${token}`;
+        config.headers = headers;
       }
     } catch (error) {
       console.error('Error getting authentication token:', error);
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Handle auth errors (401)
 api.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
+  async (error: AxiosError<ApiErrorPayload>) => {
+    const originalRequest = error.config as RetryableRequestConfig | undefined;
 
-    // If we get a 401 and haven't retried yet, try refreshing the token
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
       originalRequest._retry = true;
 
       try {
-        // Get a fresh token from Clerk
         const token = await getToken();
         if (token) {
-          originalRequest.headers.Authorization = `Bearer ${token}`;
+          const headers: AxiosRequestHeaders = (originalRequest.headers || {}) as AxiosRequestHeaders;
+          headers.Authorization = `Bearer ${token}`;
+          originalRequest.headers = headers;
           return api(originalRequest);
         }
       } catch (refreshError) {
@@ -54,58 +64,48 @@ api.interceptors.response.use(
   }
 );
 
+export const authApi = {
+  syncProfile: async (data: { displayName?: string | null; photoUrl?: string | null }) => {
+    const response = await api.post<{ user: BackendUser }>('/auth/sync', data);
+    return response.data.user;
+  },
+  getMe: async (): Promise<BackendUser> => {
+    const response = await api.get<{ user: BackendUser }>('/auth/me');
+    return response.data.user;
+  },
+};
+
 export const boardsApi = {
-  // Get all boards for user
   getBoards: async (): Promise<Board[]> => {
-    const response = await api.get('/lists');
+    const response = await api.get<{ lists: Board[] }>('/lists');
     return response.data.lists;
   },
-
-  // Get single board
   getBoard: async (id: number): Promise<Board> => {
-    const response = await api.get(`/lists/${id}`);
+    const response = await api.get<{ list: Board }>(`/lists/${id}`);
     return response.data.list;
   },
-
-  // Create new board
   createBoard: async (data: CreateBoardRequest): Promise<Board> => {
-    const response = await api.post('/lists', data);
+    const response = await api.post<{ list: Board }>('/lists', data);
     return response.data.list;
   },
-
-  // Update board
   updateBoard: async (id: number, data: Partial<CreateBoardRequest>): Promise<Board> => {
-    const response = await api.put(`/lists/${id}`, data);
+    const response = await api.put<{ list: Board }>(`/lists/${id}`, data);
     return response.data.list;
   },
-
-  // Delete board
   deleteBoard: async (id: number): Promise<void> => {
     await api.delete(`/lists/${id}`);
   },
 };
 
 export const itemsApi = {
-  // Get items for a board
   getItems: async (listId: number): Promise<Item[]> => {
-    const response = await api.get(`/items/list/${listId}`);
+    const response = await api.get<{ items: Item[] }>(`/items/list/${listId}`);
     return response.data.items;
   },
-
-  // Get single item
-  getItem: async (id: number): Promise<Item> => {
-    // Note: You may need to add this endpoint to your backend
-    const response = await api.get(`/items/${id}`);
-    return response.data.item;
-  },
-
-  // Add item to board
   addItem: async (data: AddItemRequest): Promise<Item> => {
-    const response = await api.post('/items', data);
+    const response = await api.post<{ item: Item }>('/items', data);
     return response.data.item;
   },
-
-  // Delete item
   deleteItem: async (id: number): Promise<void> => {
     await api.delete(`/items/${id}`);
   },

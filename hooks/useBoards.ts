@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Board, FilterType } from '../services/types';
+import { Board, FilterType, CreateBoardRequest } from '../services/types';
 import { boardsApi } from '../services/api';
 
 export function useBoards() {
@@ -26,6 +26,23 @@ export function useBoards() {
     fetchBoards();
   }, [fetchBoards]);
 
+  const createBoard = useCallback(async (data: CreateBoardRequest) => {
+    const created = await boardsApi.createBoard(data);
+    setBoards((prev) => [created, ...prev]);
+    return created;
+  }, []);
+
+  const updateBoard = useCallback(async (id: number, data: Partial<CreateBoardRequest>) => {
+    const updated = await boardsApi.updateBoard(id, data);
+    setBoards((prev) => prev.map((board) => (board.id === id ? updated : board)));
+    return updated;
+  }, []);
+
+  const deleteBoard = useCallback(async (id: number) => {
+    await boardsApi.deleteBoard(id);
+    setBoards((prev) => prev.filter((board) => board.id !== id));
+  }, []);
+
   const filteredBoards = boards.filter((board) => {
     if (filter === FilterType.ALL) return true;
     if (filter === FilterType.RECENT) {
@@ -49,5 +66,8 @@ export function useBoards() {
     filter,
     setFilter,
     refetch: fetchBoards,
+    createBoard,
+    updateBoard,
+    deleteBoard,
   };
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Item, ItemFilterType } from '../services/types';
+import { Item, ItemFilterType, AddItemRequest } from '../services/types';
 import { itemsApi } from '../services/api';
 
 export function useItems(listId: number) {
@@ -26,6 +26,20 @@ export function useItems(listId: number) {
     fetchItems();
   }, [fetchItems]);
 
+  const addItem = useCallback(
+    async (data: AddItemRequest) => {
+      const created = await itemsApi.addItem(data);
+      setItems((prev) => [...prev, created].sort((a, b) => a.position - b.position));
+      return created;
+    },
+    []
+  );
+
+  const deleteItem = useCallback(async (id: number) => {
+    setItems((prev) => prev.filter((item) => item.id !== id));
+    await itemsApi.deleteItem(id);
+  }, []);
+
   const filteredItems = items.filter((item) => {
     if (filter === ItemFilterType.ALL) return true;
     if (filter === ItemFilterType.VIDEOS) {
@@ -42,10 +56,13 @@ export function useItems(listId: number) {
 
   return {
     items: filteredItems,
+    allItems: items,
     loading,
     error,
     filter,
     setFilter,
     refetch: fetchItems,
+    addItem,
+    deleteItem,
   };
 }

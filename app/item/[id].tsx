@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,34 +15,31 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/Colors';
 import { Item } from '../../services/types';
-import { itemsApi } from '../../services/api';
 
 export default function ItemScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const itemId = parseInt(id || '0');
+  const { id, item: itemParam } = useLocalSearchParams<{ id?: string; item?: string }>();
 
-  const [item, setItem] = useState<Item | null>(null);
-  const [loading, setLoading] = useState(true);
+  const parsedItem = useMemo(() => {
+    if (!itemParam) return null;
+
+    try {
+      const serialized = Array.isArray(itemParam) ? itemParam[0] : itemParam;
+      return JSON.parse(decodeURIComponent(serialized)) as Item;
+    } catch (error) {
+      console.error('Unable to parse item payload from navigation params', error);
+      return null;
+    }
+  }, [itemParam]);
+
+  const [item] = useState<Item | null>(parsedItem);
+  const [loading, setLoading] = useState(!parsedItem);
 
   useEffect(() => {
-    loadItem();
-  }, [itemId]);
-
-  const loadItem = async () => {
-    try {
-      setLoading(true);
-      // Note: You may need to add a getItem endpoint to your backend
-      // For now, this will error - you can implement it later
-      const data = await itemsApi.getItem(itemId);
-      setItem(data);
-    } catch (error) {
-      console.error('Error loading item:', error);
-      Alert.alert('Error', 'Failed to load item');
-    } finally {
+    if (!parsedItem) {
       setLoading(false);
     }
-  };
+  }, [parsedItem]);
 
   const handleOpenSource = async () => {
     if (item?.url) {
@@ -79,8 +76,7 @@ export default function ItemScreen() {
     );
   }
 
-  // Extract tags from metadata if available
-  const tags = item.metadata?.tags || ['travel', 'beach', 'resort'];
+  const tags = item.metadata?.tags || item.metadata?.keywords || [];
   const savedDate = new Date(item.created_at).toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
@@ -145,7 +141,7 @@ export default function ItemScreen() {
 
           {/* Saved Info */}
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Saved to: My Travel Wishlist</Text>
+            <Text style={styles.sectionLabel}>Saved to list #{item.list_id}</Text>
             <Text style={styles.savedDate}>Added on {savedDate}</Text>
           </View>
 

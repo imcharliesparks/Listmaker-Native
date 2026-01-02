@@ -7,13 +7,29 @@ import { Ionicons } from '@expo/vector-icons';
 
 interface ItemCardProps {
   item: Item;
+  onPress?: (item: Item) => void;
+  onDelete?: (item: Item) => void;
 }
 
-export default function ItemCard({ item }: ItemCardProps) {
+export default function ItemCard({ item, onPress, onDelete }: ItemCardProps) {
   const router = useRouter();
 
   const handlePress = () => {
-    router.push(`/item/${item.id}`);
+    if (onPress) {
+      onPress(item);
+      return;
+    }
+
+    router.push({
+      pathname: '/item/[id]',
+      params: { id: item.id.toString(), item: encodeURIComponent(JSON.stringify(item)) },
+    });
+  };
+
+  const handleLongPress = () => {
+    if (onDelete) {
+      onDelete(item);
+    }
   };
 
   const getSourceIcon = () => {
@@ -38,6 +54,8 @@ export default function ItemCard({ item }: ItemCardProps) {
         pressed && styles.pressed,
       ]}
       onPress={handlePress}
+      onLongPress={handleLongPress}
+      delayLongPress={250}
     >
       {item.thumbnail_url ? (
         <Image

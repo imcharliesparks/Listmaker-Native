@@ -10,10 +10,10 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { Colors } from '../../constants/Colors';
-import { FilterType } from '../../services/types';
+import { CreateBoardRequest, FilterType } from '../../services/types';
 import { useBoards } from '../../hooks/useBoards';
 import BoardCard from '../../components/BoardCard';
 import FilterTabs from '../../components/FilterTabs';
@@ -21,6 +21,7 @@ import FloatingActionButton from '../../components/FloatingActionButton';
 import EmptyState from '../../components/EmptyState';
 import Header from "@/components/Header";
 import {Pages} from "@/constants/Shared";
+import { BoardFormModal } from '@/components/BoardFormModal';
 
 const FILTER_TABS = [
   { id: FilterType.ALL, label: 'All Boards' },
@@ -29,9 +30,16 @@ const FILTER_TABS = [
 ];
 
 export default function BoardsScreen() {
-  const router = useRouter();
-  const { boards, loading, error, filter, setFilter, refetch } = useBoards();
+  const { boards, loading, error, filter, setFilter, refetch, createBoard } = useBoards();
   const [refreshing, setRefreshing] = useState(false);
+  const [isBoardModalVisible, setBoardModalVisible] = useState(false);
+  const [isSubmittingBoard, setSubmittingBoard] = useState(false);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -40,12 +48,21 @@ export default function BoardsScreen() {
   };
 
   const handleCreateBoard = () => {
-    // For MVP, show alert - implement modal later
-    Alert.alert(
-      'Create Board',
-      'Board creation modal will be implemented',
-      [{ text: 'OK' }]
-    );
+    setBoardModalVisible(true);
+  };
+
+  const handleSubmitBoard = async (data: CreateBoardRequest) => {
+    setSubmittingBoard(true);
+    try {
+      await createBoard(data);
+      setBoardModalVisible(false);
+    } catch (err: any) {
+      console.error('Failed to create board', err);
+      const message = err?.response?.data?.error || 'Could not create board. Please try again.';
+      Alert.alert('Create Board Failed', message);
+    } finally {
+      setSubmittingBoard(false);
+    }
   };
 
   if (loading && !refreshing) {
@@ -69,6 +86,16 @@ export default function BoardsScreen() {
         activeTab={filter}
         onTabChange={(tabId) => setFilter(tabId as FilterType)}
       />
+
+      {error && (
+          <View style={styles.errorBanner}>
+              <Ionicons name="alert-circle" size={16} color={Colors.error}/>
+              <Text style={styles.errorText}>{error}</Text>
+              <Pressable onPress={refetch}>
+                  <Text style={styles.retryText}>Retry</Text>
+              </Pressable>
+          </View>
+      )}
 
       {/* Boards Grid */}
       {boards.length === 0 ? (
@@ -97,6 +124,13 @@ export default function BoardsScreen() {
 
       {/* FAB */}
       <FloatingActionButton onPress={handleCreateBoard} />
+
+      <BoardFormModal
+        visible={isBoardModalVisible}
+        onClose={() => setBoardModalVisible(false)}
+        onSubmit={handleSubmitBoard}
+        submitting={isSubmittingBoard}
+      />
     </SafeAreaView>
   );
 }
@@ -176,5 +210,27 @@ const styles = StyleSheet.create({
   row: {
     justifyContent: 'space-between',
     gap: 16,
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#FEE2E2',
+    borderColor: Colors.error,
+    borderWidth: 1,
+    marginHorizontal: 16,
+    borderRadius: 12,
+  },
+  errorText: {
+    flex: 1,
+    color: Colors.error,
+    fontSize: 13,
+  },
+  retryText: {
+    color: Colors.primary,
+    fontWeight: '600',
+    fontSize: 13,
   },
 });

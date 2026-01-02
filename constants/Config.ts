@@ -1,5 +1,8 @@
-// Replace with your actual backend URL
-export const API_BASE_URL = 'http://localhost:3000/api';
+const rawBackendUrl = process.env.EXPO_PUBLIC_BACKEND_URL;
 
-// For testing without auth - replace with actual user ID from your database
-export const TEST_USER_ID = 'test-user-123';
+if (!rawBackendUrl) {
+  throw new Error('Missing EXPO_PUBLIC_BACKEND_URL. Set it to your backend API base (e.g. http://192.168.x.x:3001/api)');
+}
+
+// Normalize to avoid trailing slash issues
+export const API_BASE_URL = rawBackendUrl.replace(/\/$/, '');

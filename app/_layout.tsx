@@ -6,10 +6,12 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import 'react-native-reanimated';
+import { ClerkProvider, ClerkLoaded } from '@clerk/clerk-expo';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { Colors } from '@/constants/Colors';
+import { tokenCache } from '@/config/clerk';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -45,10 +47,23 @@ export default function RootLayout() {
     return null;
   }
 
+  // Get Clerk publishable key from environment variables
+  const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
+
+  if (!publishableKey) {
+    throw new Error(
+      'Missing Publishable Key. Please set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in your .env file'
+    );
+  }
+
   return (
-    <AuthProvider>
-      <RootLayoutNav />
-    </AuthProvider>
+    <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
+      <ClerkLoaded>
+        <AuthProvider>
+          <RootLayoutNav />
+        </AuthProvider>
+      </ClerkLoaded>
+    </ClerkProvider>
   );
 }
 

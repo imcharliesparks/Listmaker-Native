@@ -1,9 +1,10 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User, onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
-import { auth } from '@/config/firebase';
+import React, { createContext, useContext, useEffect, ReactNode } from 'react';
+import { useUser, useAuth as useClerkAuth } from '@clerk/clerk-expo';
+import { setTokenProvider } from '@/services/tokenProvider';
+import type { UserResource } from '@clerk/types';
 
 interface AuthContextType {
-  user: User | null;
+  user: UserResource | null | undefined;
   isLoading: boolean;
   isAuthenticated: boolean;
   signOut: () => Promise<void>;
@@ -16,23 +17,25 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { user, isLoaded: isUserLoaded } = useUser();
+  const { signOut: clerkSignOut, getToken } = useClerkAuth();
 
+  // Set up the token provider for the API service
   useEffect(() => {
-    // Subscribe to auth state changes
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      setUser(firebaseUser);
-      setIsLoading(false);
+    setTokenProvider(async () => {
+      try {
+        // Get the token from Clerk
+        return await getToken();
+      } catch (error) {
+        console.error('Error getting token from Clerk:', error);
+        return null;
+      }
     });
-
-    // Cleanup subscription on unmount
-    return () => unsubscribe();
-  }, []);
+  }, [getToken]);
 
   const signOut = async () => {
     try {
-      await firebaseSignOut(auth);
+      await clerkSignOut();
     } catch (error) {
       console.error('Error signing out:', error);
       throw error;
@@ -41,7 +44,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const value: AuthContextType = {
     user,
-    isLoading,
+    isLoading: !isUserLoaded,
     isAuthenticated: !!user,
     signOut,
   };

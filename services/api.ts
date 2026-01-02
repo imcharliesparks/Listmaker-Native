@@ -1,7 +1,7 @@
 import axios from 'axios';
-import { API_BASE_URL } from '../constants/Config';
+import { API_BASE_URL } from '@/constants/Config';
 import { Board, Item, CreateBoardRequest, AddItemRequest } from './types';
-import { auth } from '@/config/firebase';
+import { getToken } from './tokenProvider';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -10,21 +10,25 @@ const api = axios.create({
   },
 });
 
-// Add Firebase token to all requests
-api.interceptors.request.use(async (config) => {
-  const user = auth.currentUser;
-  if (user) {
+// Add Clerk token to all requests
+api.interceptors.request.use(
+  async (config) => {
     try {
-      const token = await user.getIdToken();
-      config.headers.Authorization = `Bearer ${token}`;
+      const token = await getToken();
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     } catch (error) {
-      console.error('Error getting Firebase token:', error);
+      console.error('Error getting authentication token:', error);
     }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
   }
-  return config;
-});
+);
 
-// Handle auth errors (401) by potentially refreshing token
+// Handle auth errors (401)
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -34,16 +38,15 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
-      const user = auth.currentUser;
-      if (user) {
-        try {
-          // Force refresh the token
-          const token = await user.getIdToken(true);
+      try {
+        // Get a fresh token from Clerk
+        const token = await getToken();
+        if (token) {
           originalRequest.headers.Authorization = `Bearer ${token}`;
           return api(originalRequest);
-        } catch (refreshError) {
-          console.error('Error refreshing token:', refreshError);
         }
+      } catch (refreshError) {
+        console.error('Error refreshing token:', refreshError);
       }
     }
 

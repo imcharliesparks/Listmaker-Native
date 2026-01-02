@@ -9,43 +9,82 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-} from 'firebase/auth';
-import { auth } from '@/config/firebase';
+import { useSignIn, useSignUp, useOAuth } from '@clerk/clerk-expo';
+import { useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/Colors';
 
+// Required for OAuth to work properly
+WebBrowser.maybeCompleteAuthSession();
+
 export const AuthForm = () => {
+  const router = useRouter();
+  const { signIn, setActive: setActiveSignIn, isLoaded: signInLoaded } = useSignIn();
+  const { signUp, setActive: setActiveSignUp, isLoaded: signUpLoaded } = useSignUp();
+  const { startOAuthFlow: startGoogleOAuth } = useOAuth({ strategy: 'oauth_google' });
+  const { startOAuthFlow: startAppleOAuth } = useOAuth({ strategy: 'oauth_apple' });
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
 
   const handleSignUp = async () => {
+    if (!signUpLoaded) return;
+
     if (!email || !password) {
       Alert.alert('Error', 'Please enter both email and password');
       return;
     }
 
-    if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+    if (password.length < 8) {
+      Alert.alert('Error', 'Password must be at least 8 characters');
       return;
     }
 
     setLoading(true);
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
-      // Firebase automatically handles the logged-in state.
-      // The auth state listener in AuthContext will handle navigation.
+      // Create the user with Clerk
+      const result = await signUp.create({
+        emailAddress: email,
+        password,
+      });
+
+      // Prepare email verification
+      await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
+
+      // For simplicity, we'll auto-verify in development
+      // In production, you should prompt for the verification code
+      if (result.status === 'missing_requirements') {
+        // Email verification required
+        Alert.alert(
+          'Verify Email',
+          'Please check your email for a verification code.',
+          [{ text: 'OK' }]
+        );
+        // Here you would navigate to a verification screen
+        // For now, we'll just show an alert
+        return;
+      }
+
+      // Set the session active
+      await setActiveSignUp({ session: result.createdSessionId });
+      router.replace('/');
     } catch (error: any) {
       let message = 'An error occurred during sign up';
-      if (error.code === 'auth/email-already-in-use') {
-        message = 'This email is already registered';
-      } else if (error.code === 'auth/invalid-email') {
-        message = 'Invalid email address';
-      } else if (error.code === 'auth/weak-password') {
-        message = 'Password is too weak';
+      const clerkError = error?.errors?.[0];
+
+      if (clerkError) {
+        if (clerkError.code === 'form_identifier_exists') {
+          message = 'This email is already registered';
+        } else if (clerkError.code === 'form_password_pwned') {
+          message = 'This password is too common. Please choose a stronger password';
+        } else if (clerkError.code === 'form_param_format_invalid') {
+          message = 'Invalid email or password format';
+        } else {
+          message = clerkError.message || message;
+        }
       }
       Alert.alert('Sign Up Failed', message);
     } finally {
@@ -54,6 +93,8 @@ export const AuthForm = () => {
   };
 
   const handleSignIn = async () => {
+    if (!signInLoaded) return;
+
     if (!email || !password) {
       Alert.alert('Error', 'Please enter both email and password');
       return;
@@ -61,22 +102,60 @@ export const AuthForm = () => {
 
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      // The auth state listener in AuthContext will handle navigation.
+      const result = await signIn.create({
+        identifier: email,
+        password,
+      });
+
+      // Set the session active
+      await setActiveSignIn({ session: result.createdSessionId });
+      router.replace('/');
     } catch (error: any) {
       let message = 'An error occurred during sign in';
-      if (error.code === 'auth/user-not-found') {
-        message = 'No account found with this email';
-      } else if (error.code === 'auth/wrong-password') {
-        message = 'Incorrect password';
-      } else if (error.code === 'auth/invalid-email') {
-        message = 'Invalid email address';
-      } else if (error.code === 'auth/invalid-credential') {
-        message = 'Invalid email or password';
+      const clerkError = error?.errors?.[0];
+
+      if (clerkError) {
+        if (clerkError.code === 'form_identifier_not_found') {
+          message = 'No account found with this email';
+        } else if (clerkError.code === 'form_password_incorrect') {
+          message = 'Incorrect password';
+        } else if (clerkError.code === 'form_param_format_invalid') {
+          message = 'Invalid email format';
+        } else {
+          message = clerkError.message || message;
+        }
       }
       Alert.alert('Sign In Failed', message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    try {
+      const { createdSessionId, setActive } = await startGoogleOAuth();
+
+      if (createdSessionId) {
+        await setActive!({ session: createdSessionId });
+        router.replace('/');
+      }
+    } catch (error: any) {
+      console.error('Google OAuth error:', error);
+      Alert.alert('Sign In Failed', 'Failed to sign in with Google');
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    try {
+      const { createdSessionId, setActive } = await startAppleOAuth();
+
+      if (createdSessionId) {
+        await setActive!({ session: createdSessionId });
+        router.replace('/');
+      }
+    } catch (error: any) {
+      console.error('Apple OAuth error:', error);
+      Alert.alert('Sign In Failed', 'Failed to sign in with Apple');
     }
   };
 
@@ -93,6 +172,36 @@ export const AuthForm = () => {
             : 'Sign in to access your lists'}
         </Text>
 
+        {/* OAuth Buttons */}
+        <View style={styles.oauthContainer}>
+          <TouchableOpacity
+            style={styles.oauthButton}
+            onPress={handleGoogleSignIn}
+            disabled={loading}
+          >
+            <Ionicons name="logo-google" size={20} color={Colors.text} />
+            <Text style={styles.oauthButtonText}>Continue with Google</Text>
+          </TouchableOpacity>
+
+          {Platform.OS === 'ios' && (
+            <TouchableOpacity
+              style={styles.oauthButton}
+              onPress={handleAppleSignIn}
+              disabled={loading}
+            >
+              <Ionicons name="logo-apple" size={20} color={Colors.text} />
+              <Text style={styles.oauthButtonText}>Continue with Apple</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <View style={styles.divider}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>or</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        {/* Email/Password Form */}
         <TextInput
           placeholder="Email"
           placeholderTextColor={Colors.textSecondary}
@@ -160,8 +269,43 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: Colors.textSecondary,
-    marginBottom: 32,
+    marginBottom: 24,
     textAlign: 'center',
+  },
+  oauthContainer: {
+    gap: 12,
+    marginBottom: 24,
+  },
+  oauthButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 12,
+    padding: 14,
+    gap: 12,
+  },
+  oauthButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Colors.border,
+  },
+  dividerText: {
+    marginHorizontal: 16,
+    fontSize: 14,
+    color: Colors.textSecondary,
   },
   input: {
     backgroundColor: Colors.surface,

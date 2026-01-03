@@ -1,92 +1,90 @@
-# Listmaker Native – Project Specification
+# Listmaker Native - Project Specification
 
 ## Overview
-- Expo/React Native (TypeScript) mobile app that lets a user view Pinterest-style “boards” (lists) and their “items” (links/videos/etc.).
-- File-based navigation is handled by Expo Router with stack + tabs; theming uses React Navigation ThemeProvider.
-- Data is fetched from a REST backend at `API_BASE_URL` (`constants/Config.ts`), currently `http://localhost:3000/api`. Authentication is not wired into API calls yet.
-- Firebase is initialized for email/password auth (see `services/firebase.ts`) but not yet integrated into data fetching.
+- Expo/React Native (TypeScript) mobile app for Pinterest-style boards (lists) and items (links/videos/images).
+- Routing with Expo Router using route groups: `(auth)` for Clerk auth flows and `(home)` for the main app.
+- UI built with NativeWind + Tailwind + React Native Reusables (ShadCN RN primitives).
+- Data fetched from a REST backend at `API_BASE_URL` (`constants/Config.ts`), currently `http://localhost:3000/api`. API calls are not yet authenticated.
+- Authentication handled with Clerk Expo SDK; custom sign-in/up/forgot/reset screens using Clerk hooks. Sessions cached with `expo-secure-store`.
 
 ## Tech Stack
 - React Native 0.81, React 19, Expo SDK 54, Expo Router 6.
 - State: React hooks only.
 - Networking: Axios.
-- UI: React Native + @expo/vector-icons + react-native-safe-area-context + react-native-screens; basic custom components.
-- Auth: @react-native-firebase/auth (email/password).
+- UI: NativeWind + TailwindCSS + ShadCN RN components (Reusables); lucide-react-native icons.
+- Auth: Clerk Expo (`@clerk/clerk-expo`) with SecureStore token cache.
 
 ## Configuration & External Resources
 - `constants/Config.ts`
-  - `API_BASE_URL`: `http://localhost:3000/api` (change per backend host/device).
-  - `TEST_USER_ID`: hardcoded placeholder for future auth.
-- `services/firebase.ts`
-  - Initializes Firebase app with project `listmaker-8e57e`; exports `FIREBASE_APP`, `FIREBASE_AUTH` (email/password). No token handling is wired into Axios.
-- Assets: default Expo template fonts (`assets/fonts/SpaceMono-Regular.ttf`); other assets not referenced in code.
+  - `API_BASE_URL`: `http://localhost:3000/api` (update per backend host/device).
+  - `TEST_USER_ID`: legacy placeholder; API calls currently unauthenticated.
+- Environment
+  - `.env` expects `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY`.
+- Auth token cache: `config/clerk.ts` re-exports Clerk’s `tokenCache` (SecureStore).
 
 ## API Surface (Consumed)
-- Base client: `services/api.ts` creates Axios instance with JSON headers, no auth headers.
+- Base client: `services/api.ts` (Axios, JSON headers, no auth headers yet).
 - Boards (`boardsApi`):
-  - `getBoards() -> GET /lists` → expects `{ lists: Board[] }`.
-  - `getBoard(id) -> GET /lists/:id` → expects `{ list: Board }`.
-  - `createBoard(data) -> POST /lists` → expects `{ list: Board }`.
-  - `updateBoard(id, data) -> PUT /lists/:id` → expects `{ list: Board }`.
+  - `getBoards() -> GET /lists` expects `{ lists: Board[] }`.
+  - `getBoard(id) -> GET /lists/:id` expects `{ list: Board }`.
+  - `createBoard(data) -> POST /lists` expects `{ list: Board }`.
+  - `updateBoard(id, data) -> PUT /lists/:id` expects `{ list: Board }`.
   - `deleteBoard(id) -> DELETE /lists/:id`.
 - Items (`itemsApi`):
-  - `getItems(listId) -> GET /items/list/:listId` → expects `{ items: Item[] }`.
-  - `getItem(id) -> GET /items/:id` → expects `{ item: Item }` (backend endpoint may be missing per comment).
-  - `addItem(data) -> POST /items` → expects `{ item: Item }`.
+  - `getItems(listId) -> GET /items/list/:listId` expects `{ items: Item[] }`.
+  - `getItem(id) -> GET /items/:id` expects `{ item: Item }` (backend endpoint may be missing).
+  - `addItem(data) -> POST /items` expects `{ item: Item }`.
   - `deleteItem(id) -> DELETE /items/:id`.
 
 ## Data Models (`services/types.ts`)
 - `Board`: id, user_id, title, description?, is_public, cover_image?, created_at, updated_at, item_count?.
 - `Item`: id, list_id, url, title?, description?, thumbnail_url?, source_type?, metadata?, position, created_at, updated_at.
-- Request shapes: `CreateBoardRequest`, `AddItemRequest`.
+- Requests: `CreateBoardRequest`, `AddItemRequest`.
 - Filters: `FilterType` (all/recent/favorites), `ItemFilterType` (all/videos/images/links).
 
 ## Navigation & Screens
-- Stack defined in `app/_layout.tsx`: screens `(tabs)`, `board/[id]`, `item/[id]`, `modal`; wraps ThemeProvider and font loading.
-- Web shell: `app/+html.tsx`; not-found fallback `app/+not-found.tsx`.
-- `app/(tabs)/_layout.tsx`: single tab “Boards”.
-- `app/(tabs)/index.tsx` (BoardsScreen):
-  - Shows header (`components/Header`) with search/avatar placeholders.
-  - Filter tabs for boards (all/recent/favorites).
-  - Grid of `BoardCard` components; pull-to-refresh triggers `useBoards().refetch`.
-  - FAB triggers placeholder alert for board creation.
-- `app/board/[id].tsx` (BoardScreen):
-  - Loads board via `boardsApi.getBoard`; items via `useItems(boardId)`.
-  - Header with back/share/ellipsis buttons.
-  - Optional cover-image strip; item count/public badge.
-  - Item filter tabs; two-column grid of `ItemCard`; pull-to-refresh refetches board/items.
-  - FAB triggers placeholder alert for adding item.
-- `app/item/[id].tsx` (ItemScreen):
-  - Loads item via `itemsApi.getItem` (will fail until backend endpoint exists).
-  - Header with back/share; thumbnail if present; tags (from metadata or defaults); saved info; actions to add note (alert) and open source URL; bookmark icon placeholder.
-- `app/authentication.tsx`:
-  - Renders `Header` and `components/AuthForm` (email/password sign-in/up).
-- `app/(tabs)/two.tsx` and `app/modal.tsx`:
-  - Default Expo template/demo screens (not linked in tab layout).
+- Root stack (`app/_layout.tsx`): groups `(auth)` and `(home)`; Clerk provider + theme + PortalHost.
+- Auth group (`app/(auth)`):
+  - `sign-in.tsx`: ShadCN SignInForm (Clerk `useSignIn`), links to forgot/reset/sign-up.
+  - `sign-up.tsx`: ShadCN SignUpForm (Clerk `useSignUp`), links to sign-in.
+  - `forgot-password.tsx`: ShadCN ForgotPasswordForm, routes to reset.
+  - `reset-password.tsx`: ShadCN ResetPasswordForm, completes reset and routes home.
+  - `_layout.tsx`: redirects signed-in users to `/`.
+- Home group (`app/(home)`):
+  - `_layout.tsx`: redirects signed-out users to `/sign-in`.
+  - `index.tsx`: SignedIn/Out gate with SignOutButton or links to auth; redirects signed-in to tabs.
+  - `(tabs)/_layout.tsx`: tab layout.
+  - `(tabs)/index.tsx` (Boards): ShadCN header, filter buttons, grid of BoardCard, EmptyState, FAB placeholder alert for create board.
+  - `board/[id].tsx`: loads board via `boardsApi.getBoard`, items via `useItems`; ShadCN header, filters, item grid, FAB placeholder alert for add item.
+  - `item/[id].tsx`: loads item via `itemsApi.getItem`; ShadCN header, thumbnail, metadata, open-source button (may fail if backend endpoint missing).
+  - `modal.tsx`, `(tabs)/two.tsx`: template/demo screens (not primary flow).
+  - `user-menu.tsx`: ShadCN UserMenu from Reusables.
 
 ## Hooks
-- `hooks/useBoards.ts`: fetches boards on mount; exposes filtered list, loading/error, `filter`, `setFilter`, `refetch`. “Recent” = created within last 7 days; “Favorites” currently returns none.
-- `hooks/useItems.ts`: fetches items for a list; exposes filtered list, loading/error, `filter`, `setFilter`, `refetch`. Filters by `source_type` (youtube/image/website).
+- `hooks/useBoards.ts`: fetches boards; exposes filtered list, loading/error, `filter`, `setFilter`, `refetch`. “Recent” = created in last 7 days; “Favorites” returns none.
+- `hooks/useItems.ts`: fetches items for a list; exposes filtered list, loading/error, `filter`, `setFilter`, `refetch`. Filters by `source_type`.
 
-## Components (key)
-- `components/Header.tsx`: page header with menu/search/avatar placeholders; shows “Your Boards” subtitle on Boards page.
-- `components/BoardCard.tsx`: tappable board tile; shows up to 2 cover images, title, item count; navigates to board screen.
-- `components/ItemCard.tsx`: tappable item tile with thumbnail or source icon, optional play overlay for YouTube, bookmark placeholder; navigates to item screen.
-- `components/FilterTabs.tsx`: horizontal pressable tabs with active styling.
-- `components/FloatingActionButton.tsx`: circular FAB with configurable Ionicon.
-- `components/EmptyState.tsx`: centered icon/title/description placeholder.
-- `components/AuthForm.tsx`: email/password form using `@react-native-firebase/auth` for sign-in/sign-up with basic alerts.
-- Additional template utilities: `EditScreenInfo.tsx`, `ExternalLink.tsx`, `StyledText.tsx`, `Themed.tsx`, `useColorScheme` + web variants, `useClientOnlyValue` helpers, and a Jest snapshot test for StyledText.
+## Components (key, ShadCN/NW)
+- `Header`: ShadCN buttons/avatar/icons with subtitle on boards.
+- `BoardCard`: Card with cover images/placeholder icon, title, item count.
+- `ItemCard`: Card with thumbnail/placeholder icon, source icon, bookmark icon.
+- `FilterTabs`: ShadCN buttons styled as pills.
+- `FloatingActionButton`: ShadCN button with plus icon.
+- `EmptyState`: Card with icon/title/description.
+- Auth: `sign-in-form`, `sign-up-form`, `forgot-password-form`, `reset-password-form`, `social-connections`, `user-menu`, `SignOutButton`.
+- UI primitives: `components/ui/*` from Reusables (card, button, input, label, separator, text, avatar, popover, icon, etc.).
 
 ## Styling & Theming
-- Colors defined in `constants/Colors.ts`; used across screens/components.
-- Pages typically set background to `Colors.background` and cards to `Colors.surface`; shadows/elevation applied manually.
+- NativeWind + Tailwind with ShadCN tokens (`global.css`, `tailwind.config.js`); dark mode via `class`.
+- `lib/theme.ts` maps tokens to React Navigation themes.
+- Icons: `lucide-react-native` via `components/ui/icon`.
 
-## Known Limitations (from code)
-- No API auth; Axios client ignores Firebase auth tokens.
-- Item detail fetch endpoint may not exist; screen will alert error until backend provides `GET /items/:id`.
-- FAB actions and note/bookmark/share/search/menu are placeholders (alerts or no-op).
-- Favorites filter not implemented; avatar/logo placeholders use emoji.
+## Known Limitations
+- API calls unauthenticated; backend auth not wired.
+- Item detail GET may be missing on backend.
+- Create board / add item actions still show placeholder alerts.
+- Favorites filter has no data logic.
+- Legacy `constants/Colors.ts` remains but primary UI now uses Tailwind tokens.
 
 ## Scripts (package.json)
-- `npm start`, `npm run android`, `npm run ios`, `npm run web` (all run `expo start` with platform flags).
+- `bunx expo start`, `bunx expo start --android`, `--ios`, `--web` (via `bun` scripts `start/android/ios/web`).

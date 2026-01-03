@@ -1,13 +1,15 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import 'react-native-reanimated';
+import '../global.css';
 import { ClerkProvider, ClerkLoaded } from '@clerk/clerk-expo';
-
+import { PortalHost } from '@rn-primitives/portal';
+import { NAV_THEME } from '@/lib/theme';
 import { useColorScheme } from '@/components/useColorScheme';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { Colors } from '@/constants/Colors';
@@ -20,7 +22,7 @@ export {
 
 export const unstable_settings = {
   // Ensure that reloading on `/modal` keeps a back button present.
-  initialRouteName: '(tabs)',
+  initialRouteName: '(home)',
 };
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -32,7 +34,6 @@ export default function RootLayout() {
     ...FontAwesome.font,
   });
 
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
   useEffect(() => {
     if (error) throw error;
   }, [error]);
@@ -47,7 +48,6 @@ export default function RootLayout() {
     return null;
   }
 
-  // Get Clerk publishable key from environment variables
   const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
 
   if (!publishableKey) {
@@ -69,25 +69,8 @@ export default function RootLayout() {
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
-  const { isAuthenticated, isLoading } = useAuth();
-  const segments = useSegments();
-  const router = useRouter();
+  const { isLoading } = useAuth();
 
-  useEffect(() => {
-    if (isLoading) return;
-
-    const inAuthGroup = segments[0] === 'authentication';
-
-    if (!isAuthenticated && !inAuthGroup) {
-      // Redirect to authentication page if not authenticated
-      router.replace('/authentication');
-    } else if (isAuthenticated && inAuthGroup) {
-      // Redirect to main app if authenticated and on auth page
-      router.replace('/');
-    }
-  }, [isAuthenticated, isLoading, segments]);
-
-  // Show loading spinner while checking auth state
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -97,14 +80,12 @@ function RootLayoutNav() {
   }
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="authentication" options={{ headerShown: false }} />
-        <Stack.Screen name="board/[id]" options={{ headerShown: false }} />
-        <Stack.Screen name="item/[id]" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+    <ThemeProvider value={colorScheme === 'dark' ? NAV_THEME.dark : NAV_THEME.light}>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(home)" />
       </Stack>
+      <PortalHost />
     </ThemeProvider>
   );
 }

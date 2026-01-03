@@ -1,133 +1,66 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, Image } from 'react-native';
-import { Item } from '../services/types';
-import { Colors } from '../constants/Colors';
+import { Image, Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Card, CardContent } from '@/components/ui/card';
+import { Text } from '@/components/ui/text';
+import { Icon } from '@/components/ui/icon';
+import { Bookmark, Link as LinkIcon, Play, Image as ImageIcon } from 'lucide-react-native';
+import { Item } from '@/services/types';
+import { cn } from '@/lib/utils';
 
-interface ItemCardProps {
+type ItemCardProps = {
   item: Item;
-}
+};
+
+const sourceIconMap: Record<string, React.ComponentType<any>> = {
+  youtube: Play,
+  twitter: LinkIcon,
+  instagram: LinkIcon,
+  amazon: LinkIcon,
+};
 
 export default function ItemCard({ item }: ItemCardProps) {
   const router = useRouter();
-
-  const handlePress = () => {
-    router.push(`/item/${item.id}`);
-  };
-
-  const getSourceIcon = () => {
-    switch (item.source_type) {
-      case 'youtube':
-        return 'logo-youtube';
-      case 'twitter':
-        return 'logo-twitter';
-      case 'instagram':
-        return 'logo-instagram';
-      case 'amazon':
-        return 'cart';
-      default:
-        return 'link';
-    }
-  };
+  const SourceIcon = sourceIconMap[item.source_type || ''] || LinkIcon;
 
   return (
     <Pressable
-      style={({ pressed }) => [
-        styles.container,
-        pressed && styles.pressed,
-      ]}
-      onPress={handlePress}
-    >
-      {item.thumbnail_url ? (
-        <Image
-          source={{ uri: item.thumbnail_url }}
-          style={styles.thumbnail}
-          resizeMode="cover"
-        />
-      ) : (
-        <View style={styles.placeholderThumbnail}>
-          <Ionicons name={getSourceIcon()} size={32} color={Colors.primary} />
+      className="flex-1"
+      onPress={() => router.push(`/item/${item.id}`)}
+      accessibilityLabel={`Open item ${item.title || 'Untitled'}`}>
+      <Card className="overflow-hidden p-0">
+        <View className="h-32 bg-muted/40">
+          {item.thumbnail_url ? (
+            <Image source={{ uri: item.thumbnail_url }} className="h-full w-full" resizeMode="cover" />
+          ) : (
+            <View className="flex-1 items-center justify-center bg-muted">
+              <Icon as={ImageIcon} size={24} className="text-muted-foreground" />
+            </View>
+          )}
         </View>
-      )}
-
-      {item.source_type === 'youtube' && (
-        <View style={styles.playButton}>
-          <Ionicons name="play-circle" size={40} color="white" />
-        </View>
-      )}
-
-      <View style={styles.content}>
-        <Text style={styles.title} numberOfLines={2}>
-          {item.title || 'Untitled'}
-        </Text>
-        {item.description && (
-          <Text style={styles.source} numberOfLines={1}>
-            {item.description}
+        {item.source_type === 'youtube' ? (
+          <View className="absolute left-1/2 top-1/2 -ml-5 -mt-5 rounded-full bg-background/80 p-2">
+            <Icon as={Play} size={24} />
+          </View>
+        ) : null}
+        <CardContent className="gap-2 px-4 py-3">
+          <Text className="text-sm font-semibold" numberOfLines={2}>
+            {item.title || 'Untitled'}
           </Text>
-        )}
-      </View>
-
-      <Pressable style={styles.bookmarkButton}>
-        <Ionicons name="bookmark" size={20} color={Colors.textSecondary} />
-      </Pressable>
+          {item.description ? (
+            <Text className="text-muted-foreground text-xs" numberOfLines={1}>
+              {item.description}
+            </Text>
+          ) : null}
+          <View className="mt-1 flex-row items-center justify-between">
+            <View className="flex-row items-center gap-2">
+              <Icon as={SourceIcon} size={16} className="text-muted-foreground" />
+              <Text className="text-muted-foreground text-xs capitalize">{item.source_type || 'link'}</Text>
+            </View>
+            <Icon as={Bookmark} size={16} className="text-muted-foreground" />
+          </View>
+        </CardContent>
+      </Card>
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    overflow: 'hidden',
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  pressed: {
-    opacity: 0.7,
-  },
-  thumbnail: {
-    width: '100%',
-    height: 120,
-    backgroundColor: Colors.gray100,
-  },
-  placeholderThumbnail: {
-    width: '100%',
-    height: 120,
-    backgroundColor: Colors.primaryLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  playButton: {
-    position: 'absolute',
-    top: 40,
-    left: '50%',
-    marginLeft: -20,
-  },
-  content: {
-    padding: 12,
-    paddingRight: 40,
-  },
-  title: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.text,
-    marginBottom: 4,
-  },
-  source: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-  },
-  bookmarkButton: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 20,
-    padding: 8,
-  },
-});

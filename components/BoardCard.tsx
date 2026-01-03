@@ -1,123 +1,52 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, Image } from 'react-native';
-import { Board } from '../services/types';
-import { Colors } from '../constants/Colors';
+import { Image, Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Text } from '@/components/ui/text';
+import { Icon } from '@/components/ui/icon';
+import { Images } from 'lucide-react-native';
+import { Board } from '@/services/types';
+import { cn } from '@/lib/utils';
 
-interface BoardCardProps {
+type BoardCardProps = {
   board: Board;
-}
+};
 
 export default function BoardCard({ board }: BoardCardProps) {
   const router = useRouter();
-
-  const handlePress = () => {
-    router.push(`/board/${board.id}`);
-  };
-
-  // Split cover_image if it contains multiple images (like "image1.jpg,image2.jpg")
-  const coverImages = board.cover_image?.split(',') || [];
-  const displayImages = coverImages.slice(0, 2); // Show max 2 images
+  const coverImages = board.cover_image?.split(',').filter(Boolean) ?? [];
+  const displayImages = coverImages.slice(0, 2);
 
   return (
     <Pressable
-      style={({ pressed }) => [
-        styles.container,
-        pressed && styles.pressed,
-      ]}
-      onPress={handlePress}
-    >
-      <View style={styles.imageContainer}>
-        {displayImages.length > 0 ? (
-          <View style={styles.imagesGrid}>
-            {displayImages.map((img, index) => (
+      className="flex-1"
+      onPress={() => router.push(`/board/${board.id}`)}
+      accessibilityLabel={`Open board ${board.title}`}>
+      <Card className="h-full overflow-hidden p-0">
+        <View className="h-36 flex-row bg-muted/40">
+          {displayImages.length > 0 ? (
+            displayImages.map((uri, index) => (
               <Image
-                key={index}
-                source={{ uri: img.trim() }}
-                style={[
-                  styles.image,
-                  displayImages.length === 2 && index === 0 && styles.imageLeft,
-                  displayImages.length === 2 && index === 1 && styles.imageRight,
-                ]}
+                key={`${uri}-${index}`}
+                source={{ uri: uri.trim() }}
+                className={cn('h-full flex-1', displayImages.length === 2 && index === 0 && 'border-r border-border/40')}
                 resizeMode="cover"
               />
-            ))}
-          </View>
-        ) : (
-          <View style={styles.placeholderImage}>
-            <Text style={styles.placeholderText}>📋</Text>
-          </View>
-        )}
-      </View>
-
-      <View style={styles.content}>
-        <Text style={styles.title} numberOfLines={1}>
-          {board.title}
-        </Text>
-        <Text style={styles.itemCount}>
-          {board.item_count || 0} {board.item_count === 1 ? 'item' : 'items'}
-        </Text>
-      </View>
+            ))
+          ) : (
+            <View className="flex-1 items-center justify-center bg-muted">
+              <Icon as={Images} size={28} className="text-muted-foreground" />
+            </View>
+          )}
+        </View>
+        <CardHeader className="gap-1 px-4 py-3">
+          <CardTitle className="text-base">{board.title}</CardTitle>
+          <Text className="text-muted-foreground text-sm">
+            {board.item_count || 0} {board.item_count === 1 ? 'item' : 'items'}
+          </Text>
+        </CardHeader>
+        <CardContent className="pb-4" />
+      </Card>
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  pressed: {
-    opacity: 0.7,
-  },
-  imageContainer: {
-    width: '100%',
-    height: 160,
-    backgroundColor: Colors.gray100,
-  },
-  imagesGrid: {
-    flex: 1,
-    flexDirection: 'row',
-  },
-  image: {
-    width: '100%',
-    height: '100%',
-  },
-  imageLeft: {
-    width: '50%',
-    borderRightWidth: 1,
-    borderRightColor: Colors.surface,
-  },
-  imageRight: {
-    width: '50%',
-  },
-  placeholderImage: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: Colors.primaryLight,
-  },
-  placeholderText: {
-    fontSize: 48,
-  },
-  content: {
-    padding: 16,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: Colors.text,
-    marginBottom: 4,
-  },
-  itemCount: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-  },
-});

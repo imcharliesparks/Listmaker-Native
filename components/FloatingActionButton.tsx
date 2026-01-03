@@ -1,49 +1,24 @@
 import React from 'react';
-import { Pressable, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../constants/Colors';
+import { View } from 'react-native';
+import { Button } from '@/components/ui/button';
+import { Icon } from '@/components/ui/icon';
+import { Plus } from 'lucide-react-native';
 
-interface FloatingActionButtonProps {
+type FloatingActionButtonProps = {
   onPress: () => void;
-  icon?: keyof typeof Ionicons.glyphMap;
-}
+  label?: string;
+};
 
-export default function FloatingActionButton({
-  onPress,
-  icon = 'add'
-}: FloatingActionButtonProps) {
+export default function FloatingActionButton({ onPress, label }: FloatingActionButtonProps) {
   return (
-    <Pressable
-      style={({ pressed }) => [
-        styles.fab,
-        pressed && styles.pressed,
-      ]}
-      onPress={onPress}
-    >
-      <Ionicons name={icon} size={28} color={Colors.surface} />
-    </Pressable>
+    <View className="absolute bottom-6 right-6">
+      <Button
+        onPress={onPress}
+        className="h-14 rounded-full px-5 shadow-lg shadow-black/30"
+        aria-label={label || 'Add'}>
+        <Icon as={Plus} size={18} />
+        {label ? <View className="ml-2" /> : null}
+      </Button>
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  fab: {
-    position: 'absolute',
-    bottom: 24,
-    right: 24,
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: Colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  pressed: {
-    opacity: 0.8,
-    transform: [{ scale: 0.95 }],
-  },
-});
